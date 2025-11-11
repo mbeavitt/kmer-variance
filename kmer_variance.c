@@ -93,8 +93,7 @@ void skim_4mers(const char *s, bit256_t *a) {
     unsigned char kmer_mapping;
     char kmer[5];
 
-    // Step by 4 instead of 1 to get non-overlapping 4mers
-    for (int i = 0; i <= 178 - 4; i += 4) {
+    for (int i = 0; i <= 178 - 4; i++) {
         for (int j = 0; j < 4; j++) {
             kmer[j] = s[i + j];
         }
@@ -149,18 +148,16 @@ int main(int argc, char **argv) {
     }
 
 #ifdef __AVX2__
-    printf("Using AVX2 optimized version\n");
+    printf("Using AVX2\n");
 #else
     printf("Using portable version (AVX2 not available)\n");
 #endif
 
-    const char chars[5] = "ACGT";
     int num_sequences = atoi(argv[1]);
     const char *filename = argv[2];
     char temp[178];
     int idx;
     bit256_t repeat_array[num_sequences];
-    unsigned char value = KMER4_TO_BYTE(chars);
 
     memset(repeat_array, 0, sizeof(repeat_array));
 
@@ -194,7 +191,7 @@ int main(int argc, char **argv) {
 
         for (int i = 0; i < num_windows; i++) {
             int center = i + window_size / 2;
-            double diversity = sliding_window_diversity_consecutive(repeat_array, i, window_size);
+            double diversity = sliding_window_diversity_allpairs(repeat_array, i, window_size);
             printf("%d\t%.6f\n", center, diversity);
         }
     } else {
