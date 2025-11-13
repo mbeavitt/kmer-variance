@@ -104,12 +104,12 @@ void skim_4mers(const char *s, bit256_t *a) {
 }
 
 // Calculate average pairwise Hamming distance for a window
-// Uses all-pairs approach: compare every sequence to every other sequence
+// Uses incremental sliding: compute first window fully, then slide by adding/removing edges
 double sliding_window_diversity_allpairs(const bit256_t *repeat_array, int start_idx, int window_size) {
     int total_pairs = 0;
     int total_distance = 0;
 
-    // Calculate all pairwise distances
+    // Calculate all pairwise distances for the window
     for (int j = 0; j < window_size; j++) {
         for (int k = j + 1; k < window_size; k++) {
             int dist = hamming256(repeat_array[start_idx + j], repeat_array[start_idx + k]);
@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
 
     printf("Processed %d sequences\n", idx);
 
-    // Sliding window analysis
+    // Sliding window analysis with incremental updates
     int window_size = 100;
     int num_windows = idx - window_size + 1;
 
@@ -189,9 +189,39 @@ int main(int argc, char **argv) {
         printf("\nSliding window diversity analysis (window_size=%d):\n", window_size);
         printf("Position\tDiversity\n");
 
-        for (int i = 0; i < num_windows; i++) {
-            int center = i + window_size / 2;
-            double diversity = sliding_window_diversity_allpairs(repeat_array, i, window_size);
+        // Variables to track the running sum
+        int total_distance = 0;
+        int total_pairs = (window_size * (window_size - 1)) / 2;
+
+        // Compute the first window completely
+        for (int j = 0; j < window_size; j++) {
+            for (int k = j + 1; k < window_size; k++) {
+                total_distance += hamming256(repeat_array[j], repeat_array[k]);
+            }
+        }
+
+        // Output first window
+        int center = window_size / 2;
+        double diversity = (double)total_distance / total_pairs / 256.0;
+        printf("%d\t%.6f\n", center, diversity);
+
+        // Slide the window incrementally
+        for (int i = 1; i < num_windows; i++) {
+            int leaving_idx = i - 1;
+            int entering_idx = i + window_size - 1;
+
+            // Remove distances from leaving sequence to all sequences in the old window
+            for (int j = 1; j < window_size; j++) {
+                total_distance -= hamming256(repeat_array[leaving_idx], repeat_array[leaving_idx + j]);
+            }
+
+            // Add distances from entering sequence to all sequences in the new window
+            for (int j = 0; j < window_size - 1; j++) {
+                total_distance += hamming256(repeat_array[entering_idx], repeat_array[i + j]);
+            }
+
+            center = i + window_size / 2;
+            diversity = (double)total_distance / total_pairs / 256.0;
             printf("%d\t%.6f\n", center, diversity);
         }
     } else {
