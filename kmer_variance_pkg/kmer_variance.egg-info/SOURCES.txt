@@ -1,0 +1,12 @@
+MANIFEST.in
+README.md
+setup.py
+kmer_variance/__init__.py
+kmer_variance/kmer_variance_lib.c
+kmer_variance/libkmer_variance.so
+kmer_variance.egg-info/PKG-INFO
+kmer_variance.egg-info/SOURCES.txt
+kmer_variance.egg-info/dependency_links.txt
+kmer_variance.egg-info/not-zip-safe
+kmer_variance.egg-info/requires.txt
+kmer_variance.egg-info/top_level.txt

@@ -22,12 +22,12 @@
 #include <x86intrin.h>
 
 // Define a 256-bit unsigned vector (4 × 64-bit = 32 bytes)
-typedef unsigned long long v4du __attribute__((vector_size(32)));
+typedef unsigned long long v4du __attribute__((vector_size(32), aligned(32)));
 
 typedef union {
     v4du vec;
     uint64_t v[4];
-} bit256_t;
+} __attribute__((aligned(32))) bit256_t;
 
 // Compute Hamming distance between two 256-bit values (AVX2 version)
 static inline int hamming256(bit256_t a, bit256_t b) {
@@ -147,12 +147,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-#ifdef __AVX2__
-    printf("Using AVX2\n");
-#else
-    printf("Using portable version (AVX2 not available)\n");
-#endif
-
     int num_sequences = atoi(argv[1]);
     const char *filename = argv[2];
     char temp[178];
@@ -179,51 +173,43 @@ int main(int argc, char **argv) {
 
     fclose(fp);
 
-    printf("Processed %d sequences\n", idx);
-
-    // Sliding window analysis with incremental updates
+    // Sliding window analysis with incremental updates - run 1000 times for benchmarking
     int window_size = 100;
     int num_windows = idx - window_size + 1;
+    long long checksum = 0;
 
     if (num_windows > 0) {
-        printf("\nSliding window diversity analysis (window_size=%d):\n", window_size);
-        printf("Position\tDiversity\n");
+        for (int iteration = 0; iteration < 1000; iteration++) {
+            // Variables to track the running sum
+            int total_distance = 0;
+            int total_pairs = (window_size * (window_size - 1)) / 2;
 
-        // Variables to track the running sum
-        int total_distance = 0;
-        int total_pairs = (window_size * (window_size - 1)) / 2;
+            // Compute the first window completely
+            for (int j = 0; j < window_size; j++) {
+                for (int k = j + 1; k < window_size; k++) {
+                    total_distance += hamming256(repeat_array[j], repeat_array[k]);
+                }
+            }
 
-        // Compute the first window completely
-        for (int j = 0; j < window_size; j++) {
-            for (int k = j + 1; k < window_size; k++) {
-                total_distance += hamming256(repeat_array[j], repeat_array[k]);
+            // Slide the window incrementally
+            for (int i = 1; i < num_windows; i++) {
+                int leaving_idx = i - 1;
+                int entering_idx = i + window_size - 1;
+
+                // Remove distances from leaving sequence to all sequences in the old window
+                for (int j = 1; j < window_size; j++) {
+                    total_distance -= hamming256(repeat_array[leaving_idx], repeat_array[leaving_idx + j]);
+                }
+
+                // Add distances from entering sequence to all sequences in the new window
+                for (int j = 0; j < window_size - 1; j++) {
+                    total_distance += hamming256(repeat_array[entering_idx], repeat_array[i + j]);
+                }
+
+                checksum += total_distance;
             }
         }
-
-        // Output first window
-        int center = window_size / 2;
-        double diversity = (double)total_distance / total_pairs / 256.0;
-        printf("%d\t%.6f\n", center, diversity);
-
-        // Slide the window incrementally
-        for (int i = 1; i < num_windows; i++) {
-            int leaving_idx = i - 1;
-            int entering_idx = i + window_size - 1;
-
-            // Remove distances from leaving sequence to all sequences in the old window
-            for (int j = 1; j < window_size; j++) {
-                total_distance -= hamming256(repeat_array[leaving_idx], repeat_array[leaving_idx + j]);
-            }
-
-            // Add distances from entering sequence to all sequences in the new window
-            for (int j = 0; j < window_size - 1; j++) {
-                total_distance += hamming256(repeat_array[entering_idx], repeat_array[i + j]);
-            }
-
-            center = i + window_size / 2;
-            diversity = (double)total_distance / total_pairs / 256.0;
-            printf("%d\t%.6f\n", center, diversity);
-        }
+        printf("Checksum: %lld\n", checksum);
     } else {
         fprintf(stderr, "Not enough sequences (%d) for window size %d\n", idx, window_size);
     }

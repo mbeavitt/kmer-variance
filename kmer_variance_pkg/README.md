@@ -1,0 +1,87 @@
+# kmer-variance
+
+Fast sliding window kmer diversity analysis using incremental Hamming distances.
+
+## Features
+
+- **Ultra-fast**: Optimized C implementation with AVX2 support
+- **Incremental algorithm**: Computes first window fully, then slides by adding/removing edge distances
+- **Memory efficient**: Excellent cache locality, no large matrix allocations
+- **Simple API**: Single function that takes numpy arrays
+
+## Installation
+
+```bash
+pip install .
+```
+
+Or for development:
+```bash
+pip install -e .
+```
+
+## Usage
+
+```python
+import numpy as np
+from kmer_variance import sliding_window_diversity
+
+# Your sequences as a numpy array
+# Shape: (num_sequences, 178)
+# Each sequence is 178 bytes
+sequences = np.random.randint(0, 256, (1000, 178), dtype=np.uint8)
+
+# Calculate diversity across sliding windows
+diversity = sliding_window_diversity(sequences, window_size=100)
+
+# Returns array of shape (num_sequences - window_size + 1,)
+# Values are normalized to [0, 1] range
+print(f"Diversity shape: {diversity.shape}")
+print(f"Mean diversity: {diversity.mean():.4f}")
+```
+
+## API
+
+### `sliding_window_diversity(sequences, window_size=100)`
+
+Calculate kmer diversity across a sliding window of sequences.
+
+**Parameters:**
+- `sequences` (numpy.ndarray): Array of shape (num_sequences, 178) with dtype uint8
+- `window_size` (int, optional): Size of the sliding window. Default: 100
+
+**Returns:**
+- `numpy.ndarray`: Array of diversity values, one per window position
+
+**Raises:**
+- `ValueError`: If sequences has wrong shape or window_size is invalid
+- `TypeError`: If sequences is not a numpy array
+- `RuntimeError`: If the C library fails
+
+## Algorithm
+
+The function computes the average pairwise Hamming distance of 4-mer presence/absence patterns across a sliding window.
+
+For each window position:
+1. First window: Calculate all O(n²) pairwise distances
+2. Subsequent windows: Remove distances for leaving sequence, add distances for entering sequence
+3. This reduces complexity from O(W × n²) to O(W × n) where W is number of windows
+
+Each sequence is converted to a 256-bit vector representing the presence/absence of all 256 possible 4-mers (4⁴ = 256).
+
+## Performance
+
+On a dataset with 808 sequences (window size 100):
+- Single calculation: ~0.1 milliseconds
+- 1000 iterations: ~110 milliseconds
+- Excellent cache locality with data < 1MB
+
+## Requirements
+
+- Python >= 3.7
+- NumPy >= 1.19.0
+- C compiler (clang or gcc) with support for builtins
+
+## License
+
+MIT
