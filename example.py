@@ -22,7 +22,7 @@ print()
 # Example 2: Reading from a file
 print("Example 2: Real data from file")
 print("-" * 50)
-with open('../test_sampled.fa', 'rb') as f:
+with open('test_sampled.seq', 'rb') as f:
     data = f.read()
 
 num_sequences = len(data) // 178
